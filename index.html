@@ -1,0 +1,108 @@
+<html ng-app="app">
+	<head>
+		<script src="js/angular.js"></script>
+
+		<style type="text/css">
+		.forecasts {
+			list-style: none;
+			font-size:.8em;
+			text-align:left;
+		}
+
+		.text {
+			float:right;
+		}
+
+		.text img {
+			width:.8em;
+		}
+
+		input {
+			background:rgba(134, 133, 119, 0.57);
+			border:none;
+			color:white;
+			font-weight:800;
+			text-align:center;
+			font-size:1.1em;
+			width:9em;
+		}
+		</style>
+	</head>
+	<body style="background-image:url(http://hdwallpaperd.com/wp-content/uploads/2014/12/8774802-cool-designs-hd-wallpapers.jpg); text-align:center;">
+		<div style="display:inline-block; text-align:center; margin:auto; background:rgba(0, 0, 0, 0.8); color:white; padding:1em; padding-left:2em; padding-right:2em;" ng-controller="wheater">
+			<h2><input type="text" value="{{city}}" ng-model="city" /></h2>
+			<h2>{{wheater.city}}</h2>
+			<div>
+				{{wheater.type}}<br/>
+				<img width="200" ng-src="images/{{wheater.type}}.png" alt="image"><br/>
+				{{wheater.temp}}&#176;<br/><br/>
+				{{wheater.min}}&#176; / {{wheater.max}}&#176;<br/><br/>
+			</div>
+
+			<li class="forecasts" ng-repeat="forecast in wheater.forecast">
+				<span class="day" style="display:inline-block; min-width:50px;">{{forecast.day}}</span>
+				<span class="low">{{forecast.low}}</span>/<span class="high">{{forecast.high}}</span>
+				<span class="text">{{forecast.text}} <img ng-src="images/{{forecast.text}}.png" alt="image"></span>
+			</li>
+		</div>
+
+		<script type="text/javascript">
+			(function () {
+				function Wheater (city, type, temp, min, max, forecast) {
+					this.city = city;
+
+					this.type = type;
+					this.temp = temp;
+
+					this.min = min;
+					this.max = max;
+
+					this.forecast = forecast || [];
+				}
+
+				angular.module("app", []).controller("wheater", function ($scope, $http) {
+					$scope.wheater = new Wheater("Loading...", "Sunny", 0, 0, 0);
+					$scope.city = "Ranst";
+					
+
+					function getFromWoeid (woeid) {
+						if (!woeid) {
+							$scope.wheater.city = "Not found!";
+							return;
+						}
+
+						$http.get("https://query.yahooapis.com/v1/public/yql?q=select%20*%20from%20weather.forecast%20where%20woeid%3D" + woeid + "%20and%20u%3D'c'&format=json&callback=").success(function (data) {
+							if (!data || !data.query || !data.query.results || !data.query.results.channel || !data.query.results.channel.location || !data.query.results.channel.item) {
+								console.log(woeid, data, "https://query.yahooapis.com/v1/public/yql?q=select%20*%20from%20weather.forecast%20where%20woeid%3D" + woeid + "%20and%20u%3D'c'&format=json&callback=");
+								$scope.wheater.city = data.query.results.channel.description;
+								return;
+							}
+							console.log(data);
+							var city = data.query.results.channel.location.city;
+							var item = data.query.results.channel.item;
+							$scope.wheater = new Wheater(city, item.condition.text, item.condition.temp, item.forecast[0].low, item.forecast[0].high, item.forecast);
+						});
+					}
+
+					function getWoeidFromCity (city, callback) {
+						console.log("Getting from", city);
+						$http.get("https://query.yahooapis.com/v1/public/yql?q=select%20woeid%20from%20geo.placefinder%20where%20text%3D%22" + city + "%22&format=json&callback=").success(function (data) {
+							if (!data || !data.query || !data.query.results || !data.query.results.Result) {
+								console.log("Invalid data: ", data, !data, !data.query, !data.query.results || !data.query.results.Result, "https://query.yahooapis.com/v1/public/yql?q=select%20woeid%20from%20geo.placefinder%20where%20text%3D%22" + city + "%22&format=json&callback=");
+								return;
+							}
+							callback(data.query.results.Result.woeid);
+						});
+					}
+
+					setInterval(function () {
+						if ($scope.lastCity !== $scope.city) {
+							$scope.lastCity = $scope.city;
+							getWoeidFromCity($scope.city, getFromWoeid);
+						}
+					}, 1000);
+				});
+			})();
+		</script>
+	</body>
+</html>
